@@ -5,9 +5,6 @@ import numpy as np
 
 from consts import *
 
-# (X, Y)
-# X : (N, TEXT_SIZE, EMBEDDING_SIZE)
-# Y : (N, NCLASSES)
 LOADED_DATASETS = {}
 
 

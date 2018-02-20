@@ -17,7 +17,6 @@ def save_args(args):
 
 def test(model_name, test_epoch, to_log=True):
     _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
-    # del func_args['frame']
     save_args(func_args)
 
     load_dataset('ag_news', 0)

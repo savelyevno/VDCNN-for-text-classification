@@ -68,7 +68,6 @@ def train(
     if to_save_args:
         _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
         del func_args['graph']
-        # del func_args['frame']
         save_args(func_args)
 
     if vdcnn is None:

@@ -22,8 +22,6 @@ def test_params(
         results=None
         ):
     _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
-    # print(func_args)
-    # del func_args['frame']
     save_args(func_args)
 
     if results is None:
