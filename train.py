@@ -57,9 +57,11 @@ def save_args(args):
 def train(
         graph,
         last_epoch=0,
+        model_name_prefix='',
         model_name='',
         epoch_cnt=30,
-        to_save=True,
+        to_save_all=True,
+        to_save_last=False,
         to_log=True,
         to_load_dataset=True,
         vdcnn=None,
@@ -101,7 +103,7 @@ def train(
         # We start a new evaluation in case last_epoch=0 and load previous otherwise
 
         if last_epoch != 0:
-            saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(last_epoch))
+            saver.restore(sess, 'checkpoints/' + model_name_prefix + model_name + '/model-' + str(last_epoch))
         else:
             model_name = str(datetime.datetime.now())[:-7]
             sess.run(tf.global_variables_initializer())
@@ -110,9 +112,9 @@ def train(
                 func_args['model_name'] = model_name
                 save_args(func_args)
 
-        if to_save:
-            checkpoint_folder_path = load_checkpoint_path(model_name)
-            summary_writer = tf.summary.FileWriter('checkpoints/' + model_name + '/', sess.graph)
+        if to_save_all or to_save_last:
+            checkpoint_folder_path = load_checkpoint_path(model_name_prefix + model_name)
+            summary_writer = tf.summary.FileWriter('checkpoints/' + model_name_prefix + model_name + '/', sess.graph)
 
             if last_epoch == 0:
                 saver.save(sess, str(checkpoint_folder_path) + '/model', global_step=0)
@@ -168,7 +170,7 @@ def train(
                               timer.stop_start())
 
                     # Write summary
-                    if to_save:
+                    if to_save_all or to_save_last:
                         summary_writer.add_summary(summary_str, train_samples_cnt)
                         summary_writer.flush()
 
@@ -182,16 +184,17 @@ def train(
             best_accuracy = max(best_accuracy, test_accuracy)
             print_log(to_log, 'test accuracy: {}', test_accuracy)
 
-            if to_save:
+            if to_save_all or to_save_last:
                 summary_str = sess.run(validation_summary, feed_dict={validation_accuracy: test_accuracy})
                 summary_writer.add_summary(summary_str, train_samples_cnt)
                 summary_writer.flush()
 
-                saver.save(
-                    sess=sess,
-                    save_path=str(checkpoint_folder_path) + '/model',
-                    global_step=i_epoch,
-                    write_meta_graph=False)
+                if to_save_all or (to_save_last and i_epoch == last_epoch + epoch_cnt):
+                    saver.save(
+                        sess=sess,
+                        save_path=str(checkpoint_folder_path) + '/model',
+                        global_step=i_epoch,
+                        write_meta_graph=False)
 
             if to_save_args:
                 func_args['last_epoch'] = i_epoch
@@ -202,4 +205,4 @@ def train(
 
         print_log(to_log, 'training done in {}', timer.stop())
 
-    return best_accuracy
+    return best_accuracy, model_name

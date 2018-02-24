@@ -42,21 +42,24 @@ def test_params(
             vdcnn.set_params(params)
             vdcnn.build()
 
-            accuracy = train(
+            accuracy, model_name = train(
                 epoch_cnt=epoch_cnt,
-                to_save=False,
+                to_save_all=False,
+                to_save_last=True,
                 to_save_args=False,
                 to_log=False,
                 to_load_dataset=False,
+                model_name_prefix='test_params/',
                 vdcnn=vdcnn,
                 graph=graph)
 
-        results.append((accuracy, str(params)))
+        results.append((accuracy, model_name, str(params)))
 
-        Print('{}: accuracy={}; params={}', i, accuracy, str(params))
+        Print('{}: accuracy={}; model_name={}; params={}', i, accuracy, model_name, str(params))
 
         func_args['start_i'] = i + 1
         func_args['results'] = results
+        func_args['model_name'] = model_name
         save_args(func_args)
 
     results.sort(key=lambda tup: tup[0])

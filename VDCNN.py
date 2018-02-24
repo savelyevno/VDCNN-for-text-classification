@@ -1,29 +1,27 @@
 import tensorflow as tf
-from consts import TEXT_SIZE, EMBEDDING_SIZE, CURRENT_DATASET, DATASET_NCLASSES, ALPHABET_DICT, EMBEDDING_GEN_SEED, DATASET_SIZE
+from consts import TEXT_SIZE, EMBEDDING_SIZE, CURRENT_DATASET, DATASET_NCLASSES, ALPHABET_DICT, EMBEDDING_GEN_SEED, \
+    DATASET_SIZE
 import numpy as np
 from tensorflow.python.ops import control_flow_ops
-
-from NetworkParams import NetworkParams
 
 
 class VDCNN:
     def __init__(self,
-                 max_st_dev=1,
-                 reg_coef=5e-4,
+                 max_st_dev=1e-2,
+                 reg_coef=0.0,
                  learn_rate=1e-2,
-                 lr_decay_rate=1,
+                 lr_decay_rate=0.5,
                  lr_decay_freq=2,
                  batch_size=128,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],
-                 # conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
+                 conv_block_cnts=[1, 1, 1, 1],  # 9 convolutional layers
                  # conv_block_cnts=[2, 2, 2, 2],      # 17 convolutional layers
-                 conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
+                 # conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
                  hidden_layers_cnt=2048,
                  k_max_pool_cnt=8,
                  use_dropout=False,
-                 data_set_name=CURRENT_DATASET
-                 ):
+                 data_set_name=CURRENT_DATASET):
 
         self.max_st_dev = max_st_dev
         self.reg_coef = reg_coef
@@ -44,7 +42,7 @@ class VDCNN:
     @staticmethod
     def _conv1d(input_tnsr, filter_weights):
         return tf.nn.conv2d(
-            input=input_tnsr, 
+            input=input_tnsr,
             filter=filter_weights,
             strides=[1, 1, 1, 1],
             padding='SAME')
@@ -72,33 +70,33 @@ class VDCNN:
     def _batch_norm(self, input_tnsr, is_training):
         with tf.variable_scope('batch_norm'):
             phase_train = tf.convert_to_tensor(is_training, dtype=tf.bool)
-            
+
             if len(input_tnsr.get_shape()) > 2:
                 n_out = int(input_tnsr.get_shape()[3])
             else:
                 n_out = int(input_tnsr.get_shape()[1])
-            self.params_cnt += 2*n_out
+            self.params_cnt += 2 * n_out
 
             beta = tf.Variable(tf.constant(0.0, shape=[n_out], dtype=input_tnsr.dtype),
                                name='beta', trainable=True, dtype=input_tnsr.dtype)
             gamma = tf.Variable(tf.constant(1.0, shape=[n_out], dtype=input_tnsr.dtype),
                                 name='gamma', trainable=True, dtype=input_tnsr.dtype)
-            
+
             axes = list(np.arange(0, len(input_tnsr.get_shape()) - 1))
             batch_mean, batch_var = tf.nn.moments(input_tnsr, axes, name='moments')
             ema = tf.train.ExponentialMovingAverage(decay=0.995)
-            
+
             def mean_var_with_update():
                 ema_apply_op = ema.apply([batch_mean, batch_var])
                 with tf.control_dependencies([ema_apply_op]):
                     return tf.identity(batch_mean), tf.identity(batch_var)
-                
+
             mean, var = control_flow_ops.cond(phase_train,
                                               mean_var_with_update,
                                               lambda: (ema.average(batch_mean), ema.average(batch_var)))
-            
+
             normed = tf.nn.batch_normalization(input_tnsr, mean, var, beta, gamma, 1e-3)
-            
+
         return normed
 
     def _build_conv_unit(self, input_tnsr, is_training, input_features_cnt, output_features_cnt, name):
@@ -117,10 +115,11 @@ class VDCNN:
 
         return h_res
 
-    def _build_conv_block(self, input_tnsr, is_training, input_features_cnt, output_features_cnt, block_index, item_index):
+    def _build_conv_block(self, input_tnsr, is_training, input_features_cnt, output_features_cnt, block_index,
+                          item_index):
         with tf.variable_scope('conv_block_%d_%d' % (block_index, item_index)):
             h1 = self._build_conv_unit(
-                input_tnsr=input_tnsr, 
+                input_tnsr=input_tnsr,
                 is_training=is_training,
                 input_features_cnt=input_features_cnt,
                 output_features_cnt=output_features_cnt,
@@ -321,7 +320,7 @@ class VDCNN:
         #
 
         self.cross_entropy = tf.reduce_mean(
-            input_tensor=tf.nn.softmax_cross_entropy_with_logits_v2(
+            input_tensor=tf.nn.softmax_cross_entropy_with_logits(
                 labels=self.correct_labels,
                 logits=self.predictions),
             name='reduced_cross_entropy')
