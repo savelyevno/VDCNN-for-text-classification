@@ -140,7 +140,7 @@ def train(
                     vdcnn.is_training: True
                 }
 
-                if global_step % 100 != 0:
+                if global_step % 99 != 0:
                     _, global_step = sess.run(
                         [
                             vdcnn.train_step,

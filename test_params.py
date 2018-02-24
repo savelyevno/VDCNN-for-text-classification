@@ -19,7 +19,7 @@ def test_params(
         try_cnt,
         params,
         start_i=0,
-        results=None
+        results=None,
         ):
     _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
     save_args(func_args)
@@ -55,11 +55,10 @@ def test_params(
 
         results.append((accuracy, model_name, str(params)))
 
-        Print('{}: accuracy={}; model_name={}; params={}', i, accuracy, model_name, str(params))
+        Print('{}: accuracy={}; model_name=\'{}\'; params={}', i, accuracy, model_name, str(params))
 
         func_args['start_i'] = i + 1
         func_args['results'] = results
-        func_args['model_name'] = model_name
         save_args(func_args)
 
     results.sort(key=lambda tup: tup[0])
