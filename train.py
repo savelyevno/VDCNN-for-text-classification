@@ -99,6 +99,8 @@ def train(
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
+    # config.log_device_placement = True
+    config.gpu_options.visible_device_list = "1"
     with tf.Session(graph=graph, config=config) as sess:
         # We start a new evaluation in case last_epoch=0 and load previous otherwise
 
@@ -140,7 +142,7 @@ def train(
                     vdcnn.is_training: True
                 }
 
-                if global_step % 99 != 0:
+                if (global_step + 1) % 100 != 0:
                     _, global_step = sess.run(
                         [
                             vdcnn.train_step,
