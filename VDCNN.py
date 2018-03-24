@@ -7,11 +7,11 @@ from tensorflow.python.ops import control_flow_ops
 
 class VDCNN:
     def __init__(self,
-                 max_st_dev=1e-3,
+                 max_st_dev=1,
                  reg_coef=1e-4,
-                 learn_rate=1e-2,
+                 learn_rate=1e-3,
                  lr_decay_rate=0.5,
-                 lr_decay_freq=2,
+                 lr_decay_freq=1,
                  batch_size=128,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],
@@ -388,9 +388,7 @@ class VDCNN:
         self.accuracy = graph.get_tensor_by_name('accuracy_1:0')
 
     def set_params(self, params):
-        params.sample()
+        for name, value in params.items():
+            assert getattr(self, name) is not None
 
-        for i in range(params.param_cnt):
-            assert getattr(self, params.names[i]) is not None
-
-            setattr(self, params.names[i], params.values[i])
+            setattr(self, name, value)

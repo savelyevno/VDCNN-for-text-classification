@@ -1,0 +1,9 @@
+checkpoints/*
+.idea/*
+__pycache__/*
+datasets/preprocessed/*
+metadata/last_task_args.pkl
+metadata/test_params_last_args.pkl
+metadata/train_last_args.pkl
+tensorboard.sh
+*.pyc

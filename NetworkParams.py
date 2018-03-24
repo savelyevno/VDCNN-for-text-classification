@@ -4,28 +4,43 @@ import numpy as np
 class NetworkParams:
     def __init__(self,
                  names,
-                 log_domains):
+                 domains,
+                 is_log,
+                 is_random,
+                 sample_count):
         self.names = names
-        self.log_domains = log_domains
+        self.samples = []
 
-        assert len(self.names) == len(self.log_domains)
+        for i in range(sample_count):
+            values = []
 
-        self.param_cnt = len(self.names)
-        self.values = []
+            for j in range(len(names)):
+                a, b = domains[j]
 
-        self.sample()
+                if is_random[j]:
+                    val = np.random.uniform(a, b)
+                else:
+                    val = a + i * (b - a) / (sample_count - 1)
 
-    def sample(self):
-        self.values = []
-        for i in range(self.param_cnt):
-            a, b = self.log_domains[i]
-            self.values.append(10**np.random.uniform(a, b))
+                if is_log[j]:
+                    val = 10 ** val
 
-    def __str__(self):
-        res = '('
+                values.append(val)
 
-        for i in range(self.param_cnt):
-            res += self.names[i] + ': ' + str(self.values[i]) + ';'
-        res = res[:-1] + ')'
+            self.samples.append(values)
+
+        self.last_sample_ind = -1
+
+    def get_next(self):
+        res = {}
+
+        if self.last_sample_ind + 1 == len(self.samples):
+            raise Exception('All params have been already retrieved')
+
+        values = self.samples[self.last_sample_ind + 1]
+        for i in range(len(self.names)):
+            res[self.names[i]] = values[i]
+
+        self.last_sample_ind += 1
 
         return res

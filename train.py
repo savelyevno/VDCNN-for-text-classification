@@ -91,7 +91,7 @@ def train(
         tensor=validation_accuracy,
         collections=['per_epoch'])
 
-    saver = tf.train.Saver(max_to_keep=100)
+    saver = tf.train.Saver(max_to_keep=2)
 
     if to_load_dataset:
         load_datasets(CURRENT_DATASET)

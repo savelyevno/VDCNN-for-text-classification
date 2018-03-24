@@ -86,9 +86,9 @@ def start_test_params(to_continue):
         test_params(**last_args)
     else:
         test_params(
-            epoch_cnt=5,
-            try_cnt=16,
-            params=NetworkParams(['learn_rate'], [(-5, 0)]))
+            epoch_cnt=15,
+            try_cnt=5,
+            params=NetworkParams(['lr_decay_freq'], [(1, 5)], [False], [False], 5))
 
 
 if __name__ == '__main__':
