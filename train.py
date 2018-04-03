@@ -32,10 +32,10 @@ def load_checkpoint_path(model_name):
     return checkpoint_folder_path
 
 
-def calc_test_accuracy(sess, accuracy, input_tensor, y_, feed_dict):
+def calc_accuracy(sess, accuracy, input_tensor, y_, feed_dict, data_set_type):
     acc = 0
     step = 0
-    for batch in batch_iterator(CURRENT_DATASET, 0, 100, False):
+    for batch in batch_iterator(CURRENT_DATASET, data_set_type, 128, False):
         batch_size = batch[0].shape[0]
 
         feed_dict[input_tensor] = batch[0]
@@ -59,13 +59,14 @@ def train(
         last_epoch=0,
         model_name_prefix='',
         model_name='',
-        epoch_cnt=30,
+        epoch_cnt=50,
         to_save_all=True,
         to_save_last=False,
         to_log=True,
         to_load_dataset=True,
         vdcnn=None,
-        to_save_args=True):
+        to_save_args=True,
+        to_validate=False):
 
     if to_save_args:
         _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
@@ -84,14 +85,21 @@ def train(
     tf.summary.scalar(name='reg loss', tensor=vdcnn.reg_loss)
     summary = tf.summary.merge_all()
 
-    # Validation summary; is written after every epoch
-    validation_accuracy = tf.placeholder(tf.float32)
+    # Validation summary; is written every 100th batch
+    validation_accuracy_placeholder = tf.placeholder(tf.float32)
     validation_summary = tf.summary.scalar(
-        name='validation_accuracy',
-        tensor=validation_accuracy,
+        name='validation_accuracy_new',
+        tensor=validation_accuracy_placeholder,
         collections=['per_epoch'])
 
-    saver = tf.train.Saver(max_to_keep=2)
+    # Test summary; is written after every epoch
+    test_accuracy_placeholder = tf.placeholder(tf.float32)
+    test_summary = tf.summary.scalar(
+        name='test_accuracy',
+        tensor=test_accuracy_placeholder,
+        collections=['per_epoch'])
+
+    saver = tf.train.Saver(max_to_keep=0)
 
     if to_load_dataset:
         load_datasets(CURRENT_DATASET)
@@ -125,6 +133,8 @@ def train(
         global_step = 0
         train_samples_cnt = 0
         best_accuracy = 0
+        best_validation_accuracy = 0
+        train_accuracy = 0
         timer.start()
 
         print_log(to_log, 'start training...')
@@ -143,14 +153,15 @@ def train(
                 }
 
                 if (global_step + 1) % 100 != 0:
-                    _, global_step = sess.run(
+                    _, global_step, train_accuracy = sess.run(
                         [
                             vdcnn.train_step,
-                            vdcnn.global_step],
+                            vdcnn.global_step,
+                            vdcnn.accuracy],
                         feed_dict=feed_dict)
                     train_samples_cnt = global_step * vdcnn.batch_size
                 else:
-                    _, global_step, loss, accuracy, summary_str, lr, reg_loss = sess.run(
+                    _, global_step, loss, train_accuracy, summary_str, lr, reg_loss = sess.run(
                         [
                             vdcnn.train_step,
                             vdcnn.global_step,
@@ -165,7 +176,7 @@ def train(
                     print_log(to_log,
                               '\ttrain samples cnt: {}, train accuracy {}, loss {}, reg loss {}, lr: {}; dt = {}',
                               train_samples_cnt,
-                              accuracy,
+                              train_accuracy,
                               loss,
                               reg_loss,
                               lr,
@@ -176,18 +187,59 @@ def train(
                         summary_writer.add_summary(summary_str, train_samples_cnt)
                         summary_writer.flush()
 
+                if to_validate and i_epoch > 4:
+                    feed_dict[vdcnn.is_training] = False
+                    validation_accuracy = calc_accuracy(sess=sess,
+                                                        accuracy=vdcnn.accuracy,
+                                                        input_tensor=vdcnn.network_input,
+                                                        y_=vdcnn.correct_labels,
+                                                        feed_dict=feed_dict,
+                                                        data_set_type=2)
+                    # Write summary
+                    summary_str = sess.run(validation_summary, feed_dict={validation_accuracy_placeholder: validation_accuracy})
+                    summary_writer.add_summary(summary_str, train_samples_cnt)
+                    summary_writer.flush()
+
+                    if (validation_accuracy - best_validation_accuracy) > -1e-2:
+                        if validation_accuracy > best_validation_accuracy:
+                            best_validation_accuracy = validation_accuracy
+
+                        test_accuracy = calc_accuracy(
+                            sess=sess,
+                            accuracy=vdcnn.accuracy,
+                            input_tensor=vdcnn.network_input,
+                            y_=vdcnn.correct_labels,
+                            feed_dict=feed_dict,
+                            data_set_type=0)
+
+                        summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
+                        summary_writer.add_summary(summary_str, train_samples_cnt)
+                        summary_writer.flush()
+
+                        if test_accuracy > best_accuracy:
+                            best_accuracy = test_accuracy
+
+                            print_log(to_log, '\tbest test accuracy update: {}', test_accuracy)
+
+                            saver.save(
+                                sess=sess,
+                                save_path=str(checkpoint_folder_path) + '/model_best',
+                                global_step=i_epoch,
+                                write_meta_graph=False)
+
             feed_dict[vdcnn.is_training] = False
-            test_accuracy = calc_test_accuracy(
+            test_accuracy = calc_accuracy(
                 sess=sess,
                 accuracy=vdcnn.accuracy,
                 input_tensor=vdcnn.network_input,
                 y_=vdcnn.correct_labels,
-                feed_dict=feed_dict)
+                feed_dict=feed_dict,
+                data_set_type=0)
             best_accuracy = max(best_accuracy, test_accuracy)
             print_log(to_log, 'test accuracy: {}', test_accuracy)
 
             if to_save_all or to_save_last:
-                summary_str = sess.run(validation_summary, feed_dict={validation_accuracy: test_accuracy})
+                summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
                 summary_writer.add_summary(summary_str, train_samples_cnt)
                 summary_writer.flush()
 
