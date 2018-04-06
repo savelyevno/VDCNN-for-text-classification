@@ -187,7 +187,7 @@ def train(
                         summary_writer.add_summary(summary_str, train_samples_cnt)
                         summary_writer.flush()
 
-                if to_validate and i_epoch > 4:
+                if to_validate and i_epoch > 15:
                     feed_dict[vdcnn.is_training] = False
                     validation_accuracy = calc_accuracy(sess=sess,
                                                         accuracy=vdcnn.accuracy,

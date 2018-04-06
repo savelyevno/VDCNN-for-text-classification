@@ -8,10 +8,10 @@ from tensorflow.python.ops import control_flow_ops
 class VDCNN:
     def __init__(self,
                  max_st_dev=1.0,
-                 reg_coef=2e-4,
+                 reg_coef=0.0,
                  learn_rate=1e-2,
                  lr_decay_rate=0.5,
-                 lr_decay_freq=3,
+                 lr_decay_freq=4,
                  batch_size=128,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],

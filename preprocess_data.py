@@ -1,6 +1,5 @@
 import csv
 import pickle
-
 import numpy as np
 
 from consts import *
@@ -53,14 +52,7 @@ def preprocess_text(text):
 
 
 def preprocess_dataset(dataset_name, sample_type):
-    filename = original_datasets_folder + dataset_name
-    if sample_type == 0:
-        filename += '/test.csv'
-    elif sample_type == 1:
-        filename += '/train.csv'
-    else:
-        raise Exception('Invalid sample type')
-
+    filename = original_datasets_folder + dataset_name + '/' + sample_type + '.csv'
     read_data = read_csv_columns(filename, DATASET_COLUMNS[dataset_name])
 
     N = len(read_data)
@@ -75,18 +67,46 @@ def preprocess_dataset(dataset_name, sample_type):
     return X, Y
 
 
-def save_dataset(dataset_name, sample_type):
-    if sample_type == 0:
-        sample_file = 'test'
-    elif sample_type == 1:
-        sample_file = 'train'
-    else:
-        raise Exception('Invalid sample type')
-
-    X, Y = preprocess_dataset(dataset_name, sample_type)
-
-    with open(processed_datasets_folder + dataset_name + '/' + sample_file + '.pkl', 'wb') as file:
+def save_datasets(dataset_name):
+    #
+    # test
+    #
+    X, Y = preprocess_dataset(dataset_name, 'test')
+    with open(processed_datasets_folder + dataset_name + '/test.pkl', 'wb') as file:
         pickle.dump((X, Y), file)
+
+    #
+    # validation test (intersects with test set)
+    #
+    N = X.shape[0]
+
+    after_seed = np.random.randint(1 << 30)
+    np.random.seed(0)
+    vld_test_perm = np.random.permutation(N)[: int(N * VALIDATION_TEST_DATASET_SIZE_RATIO)]
+    np.random.seed(after_seed)
+
+    with open(processed_datasets_folder + dataset_name + '/vld_test.pkl', 'wb') as file:
+        pickle.dump((X[vld_test_perm], Y[vld_test_perm]), file)
+
+    #
+    # train
+    #
+    X, Y = preprocess_dataset(dataset_name, 'train')
+    N = X.shape[0]
+
+    #
+    # validation train (does not intersect with train set)
+    #
+    after_seed = np.random.randint(1 << 30)
+    np.random.seed(0)
+    val_train_perm = np.random.permutation(N)[: int(N * VALIDATION_TRAIN_DATASET_SIZE_RATIO)]
+    np.random.seed(after_seed)
+
+    with open(processed_datasets_folder + dataset_name + '/vld_train.pkl', 'wb') as file:
+        pickle.dump((X[val_train_perm], Y[val_train_perm]), file)
+
+    with open(processed_datasets_folder + dataset_name + '/train.pkl', 'wb') as file:
+        pickle.dump((np.delete(X, val_train_perm, axis=0), np.delete(Y, val_train_perm, axis=0)), file)
 
 
 def load_datasets(dataset_name):
@@ -99,23 +119,20 @@ def load_datasets(dataset_name):
     else:
         LOADED_DATASETS[dataset_name][0] = X, Y
 
-    # validation
-    N = X.shape[0]
-
-    after_seed = np.random.randint(1 << 30)
-    np.random.seed(0)
-    val_perm = np.random.permutation(N)[: int(N * VALIDATION_DATASET_SIZE_RATIO)]
-    np.random.seed(after_seed)
-
-    X_val = X[val_perm]
-    Y_val = Y[val_perm]
-    LOADED_DATASETS[dataset_name][2] = X_val, Y_val
-
     # train
     with open(processed_datasets_folder + dataset_name + '/train.pkl', 'rb') as file:
         X, Y = pickle.load(file)
-
     LOADED_DATASETS[dataset_name][1] = X, Y
+
+    # validation test (intersects with test set)
+    with open(processed_datasets_folder + dataset_name + '/vld_test.pkl', 'rb') as file:
+        X, Y = pickle.load(file)
+    LOADED_DATASETS[dataset_name][2] = X, Y
+
+    # validation train (does not intersect with train set)
+    with open(processed_datasets_folder + dataset_name + '/vld_train.pkl', 'rb') as file:
+        X, Y = pickle.load(file)
+    LOADED_DATASETS[dataset_name][3] = X, Y
 
 
 def load_dataset(dataset_name, dataset_type):
@@ -123,6 +140,10 @@ def load_dataset(dataset_name, dataset_type):
         sample_file = 'test'
     elif dataset_type == 1:
         sample_file = 'train'
+    elif dataset_type == 2:
+        sample_file = 'vld_test'
+    elif dataset_type == 3:
+        sample_file = 'vld_train'
     else:
         raise Exception('Invalid sample type')
 
@@ -136,5 +157,4 @@ def load_dataset(dataset_name, dataset_type):
 
 
 if __name__ == '__main__':
-    save_dataset('ag_news', 0)
-    save_dataset('ag_news', 1)
+    save_datasets('ag_news')

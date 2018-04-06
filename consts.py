@@ -79,7 +79,8 @@ UNKNOWN_TOKEN = len(ALPHABET_DICT)
 PADDING_TOKEN = len(ALPHABET_DICT) + 1
 
 CURRENT_DATASET = 'ag_news'
-VALIDATION_DATASET_SIZE_RATIO = 0.1
+VALIDATION_TEST_DATASET_SIZE_RATIO = 0.1
+VALIDATION_TRAIN_DATASET_SIZE_RATIO = 1/6
 
 original_datasets_folder = 'datasets/original/'
 processed_datasets_folder = 'datasets/preprocessed/'
