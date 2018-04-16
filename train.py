@@ -43,7 +43,7 @@ def calc_accuracy(sess, accuracy, input_tensor, y_, feed_dict, data_set_type):
         batch_val_acc = sess.run(accuracy, feed_dict=feed_dict)
 
         # Updating average accuracy
-        acc = (acc * step * 100 + batch_val_acc * batch_size) / (step * 100 + batch_size)
+        acc = (acc * step * 128 + batch_val_acc * batch_size) / (step * 128 + batch_size)
         step += 1
 
     return acc
@@ -187,7 +187,7 @@ def train(
                         summary_writer.add_summary(summary_str, train_samples_cnt)
                         summary_writer.flush()
 
-                if to_validate and i_epoch > 15:
+                if to_validate and i_epoch > 18:
                     feed_dict[vdcnn.is_training] = False
                     validation_accuracy = calc_accuracy(sess=sess,
                                                         accuracy=vdcnn.accuracy,
@@ -200,7 +200,7 @@ def train(
                     summary_writer.add_summary(summary_str, train_samples_cnt)
                     summary_writer.flush()
 
-                    if (validation_accuracy - best_validation_accuracy) > -1e-2:
+                    if (validation_accuracy - best_validation_accuracy) > -2e-2:
                         if validation_accuracy > best_validation_accuracy:
                             best_validation_accuracy = validation_accuracy
 
@@ -238,17 +238,16 @@ def train(
             best_accuracy = max(best_accuracy, test_accuracy)
             print_log(to_log, 'test accuracy: {}', test_accuracy)
 
-            if to_save_all or to_save_last:
-                summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
-                summary_writer.add_summary(summary_str, train_samples_cnt)
-                summary_writer.flush()
+            summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
+            summary_writer.add_summary(summary_str, train_samples_cnt)
+            summary_writer.flush()
 
-                if to_save_all or (to_save_last and i_epoch == last_epoch + epoch_cnt):
-                    saver.save(
-                        sess=sess,
-                        save_path=str(checkpoint_folder_path) + '/model',
-                        global_step=i_epoch,
-                        write_meta_graph=False)
+            if to_save_all or (to_save_last and i_epoch == last_epoch + epoch_cnt):
+                saver.save(
+                    sess=sess,
+                    save_path=str(checkpoint_folder_path) + '/model',
+                    global_step=i_epoch,
+                    write_meta_graph=False)
 
             if to_save_args:
                 func_args['last_epoch'] = i_epoch

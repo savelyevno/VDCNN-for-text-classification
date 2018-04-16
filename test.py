@@ -19,13 +19,19 @@ def test(model_name, test_epoch, to_log=True):
     _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
     save_args(func_args)
 
-    load_dataset('ag_news', 0)
+    dataset = 3
+
+    load_dataset('ag_news', dataset)
 
     print_log(to_log, 'dataset loaded')
 
     vdcnn = VDCNN()
 
-    with tf.Session() as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    # config.log_device_placement = True
+    config.gpu_options.visible_device_list = "1"
+    with tf.Session(config=config) as sess:
         vdcnn.load(
             sess=sess,
             model_name=model_name,
@@ -44,7 +50,7 @@ def test(model_name, test_epoch, to_log=True):
         accuracy = 0
         step = 0
         batch_size = 100
-        for batch in batch_iterator(CURRENT_DATASET, 0, batch_size, False):
+        for batch in batch_iterator(CURRENT_DATASET, dataset, batch_size, False):
             feed_dict = {
                 vdcnn.network_input: batch[0],
                 vdcnn.correct_labels: batch[1],

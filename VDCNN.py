@@ -7,17 +7,17 @@ from tensorflow.python.ops import control_flow_ops
 
 class VDCNN:
     def __init__(self,
-                 max_st_dev=1.0,
+                 max_st_dev=5e-3,
                  reg_coef=0.0,
                  learn_rate=1e-2,
                  lr_decay_rate=0.5,
-                 lr_decay_freq=4,
+                 lr_decay_freq=2,
                  batch_size=128,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],
                  # conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
-                 # conv_block_cnts=[2, 2, 2, 2],      # 17 convolutional layers
-                 conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
+                 conv_block_cnts=[2, 2, 2, 2],      # 17 convolutional layers
+                 # conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
                  hidden_layers_cnt=2048,
                  k_max_pool_cnt=8,
                  use_dropout=False,
@@ -309,9 +309,9 @@ class VDCNN:
             b_fc3 = self._bias_variable([DATASET_NCLASSES[self.data_set_name]])
 
             self.h.append(
-                tf.matmul(a=self.h[-1], b=W_fc3) + b_fc3)
+                tf.add(tf.matmul(a=self.h[-1], b=W_fc3), b_fc3, name='predictions'))
 
-        self.fc_loss = W_fc1_loss + W_fc2_loss + W_fc3_loss
+        self.fc_loss = tf.add(W_fc1_loss + W_fc2_loss, W_fc3_loss, name='fc_loss')
 
         self.predictions = self.h[-1]
 
@@ -359,11 +359,13 @@ class VDCNN:
 
     def load(self, sess, model_name, test_epoch):
         saver = tf.train.import_meta_graph('checkpoints/' + model_name + '/model-0.meta')
-        saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(test_epoch))
+        saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(test_epoch))
+        # saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(test_epoch))
 
         graph = tf.get_default_graph()
 
         self.network_input = graph.get_tensor_by_name('network_input:0')
+        self.predictions = graph.get_tensor_by_name('fc_3/predictions:0')
         self.correct_labels = graph.get_tensor_by_name('correct_labels:0')
         self.keep_prob = graph.get_tensor_by_name('keep_prob:0')
         self.is_training = graph.get_tensor_by_name('is_training:0')
