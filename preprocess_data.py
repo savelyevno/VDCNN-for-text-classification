@@ -13,10 +13,8 @@ def read_csv_columns(filename, columns):
 
         result = []
         for row in csvreader:
-            new_row = []
-
-            for i in columns:
-                new_row.append(row[i])
+            new_row = [row[0], row[1] + '. ' + row[2]]
+            # new_row = [row[0], row[2]]
 
             result.append(new_row)
 
@@ -54,7 +52,6 @@ def preprocess_text(text):
 def preprocess_dataset(dataset_name, sample_type):
     filename = original_datasets_folder + dataset_name + '/' + sample_type + '.csv'
     read_data = read_csv_columns(filename, DATASET_COLUMNS[dataset_name])
-
     N = len(read_data)
 
     Y = np.zeros((N, DATASET_NCLASSES[dataset_name]), dtype=np.int32)
@@ -94,6 +91,9 @@ def save_datasets(dataset_name):
     X, Y = preprocess_dataset(dataset_name, 'train')
     N = X.shape[0]
 
+    with open(processed_datasets_folder + dataset_name + '/full_train.pkl', 'wb') as file:
+        pickle.dump((X, Y), file)
+
     #
     # validation train (does not intersect with train set)
     #
@@ -105,7 +105,7 @@ def save_datasets(dataset_name):
     with open(processed_datasets_folder + dataset_name + '/vld_train.pkl', 'wb') as file:
         pickle.dump((X[val_train_perm], Y[val_train_perm]), file)
 
-    with open(processed_datasets_folder + dataset_name + '/train.pkl', 'wb') as file:
+    with open(processed_datasets_folder + dataset_name + '/partial_train.pkl', 'wb') as file:
         pickle.dump((np.delete(X, val_train_perm, axis=0), np.delete(Y, val_train_perm, axis=0)), file)
 
 
@@ -119,30 +119,37 @@ def load_datasets(dataset_name):
     else:
         LOADED_DATASETS[dataset_name][0] = X, Y
 
-    # train
-    with open(processed_datasets_folder + dataset_name + '/train.pkl', 'rb') as file:
+    # full train
+    with open(processed_datasets_folder + dataset_name + '/full_train.pkl', 'rb') as file:
         X, Y = pickle.load(file)
     LOADED_DATASETS[dataset_name][1] = X, Y
+
+    # train without validation part
+    with open(processed_datasets_folder + dataset_name + '/partial_train.pkl', 'rb') as file:
+        X, Y = pickle.load(file)
+    LOADED_DATASETS[dataset_name][2] = X, Y
 
     # validation test (intersects with test set)
     with open(processed_datasets_folder + dataset_name + '/vld_test.pkl', 'rb') as file:
         X, Y = pickle.load(file)
-    LOADED_DATASETS[dataset_name][2] = X, Y
+    LOADED_DATASETS[dataset_name][3] = X, Y
 
     # validation train (does not intersect with train set)
     with open(processed_datasets_folder + dataset_name + '/vld_train.pkl', 'rb') as file:
         X, Y = pickle.load(file)
-    LOADED_DATASETS[dataset_name][3] = X, Y
+    LOADED_DATASETS[dataset_name][4] = X, Y
 
 
 def load_dataset(dataset_name, dataset_type):
     if dataset_type == 0:
         sample_file = 'test'
     elif dataset_type == 1:
-        sample_file = 'train'
+        sample_file = 'full_train'
     elif dataset_type == 2:
-        sample_file = 'vld_test'
+        sample_file = 'partial_train'
     elif dataset_type == 3:
+        sample_file = 'vld_test'
+    elif dataset_type == 4:
         sample_file = 'vld_train'
     else:
         raise Exception('Invalid sample type')

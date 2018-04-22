@@ -67,7 +67,12 @@ def start_train(to_continue, model_name='', last_epoch=0):
                 last_args = pickle.load(file)
             train(graph, **last_args)
         else:
-            train(graph, model_name=model_name, last_epoch=last_epoch, to_validate=True)
+            train(graph,
+                  model_name=model_name,
+                  last_epoch=last_epoch,
+                  to_validate=True,
+                  validate_start_epoch=7,
+                  train_on_full_dataset=False)
 
 
 def start_test(to_continue, model_name=None, test_epoch=None):
@@ -76,7 +81,7 @@ def start_test(to_continue, model_name=None, test_epoch=None):
             last_args = pickle.load(file)
         test(**last_args)
     else:
-        test(model_name, test_epoch)
+        test(model_name, test_epoch, 0)
 
 
 def start_test_params(to_continue):

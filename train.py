@@ -18,7 +18,7 @@ def load_embeddings_graph(summary_writer):
     config = projector.ProjectorConfig()
     embedding = config.embeddings.add()
     embedding.tensor_name = 'embedding'
-    embedding.metadata_path = os.path.abspath(os.path.join(os.path.curdir, 'checkpoints/embeddings_metadata.tsv'))
+    embedding.metadata_path = '/home/nikita/PycharmProjects/VDCNN-for-text-classification/checkpoints/embeddings_metadata.tsv'
     projector.visualize_embeddings(summary_writer, config)
 
 
@@ -66,7 +66,9 @@ def train(
         to_load_dataset=True,
         vdcnn=None,
         to_save_args=True,
-        to_validate=False):
+        to_validate=False,
+        train_on_full_dataset=False,
+        validate_start_epoch=10):
 
     if to_save_args:
         _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
@@ -89,21 +91,24 @@ def train(
     validation_accuracy_placeholder = tf.placeholder(tf.float32)
     validation_summary = tf.summary.scalar(
         name='validation_accuracy_new',
-        tensor=validation_accuracy_placeholder,
-        collections=['per_epoch'])
+        tensor=validation_accuracy_placeholder)
 
     # Test summary; is written after every epoch
     test_accuracy_placeholder = tf.placeholder(tf.float32)
     test_summary = tf.summary.scalar(
         name='test_accuracy',
-        tensor=test_accuracy_placeholder,
-        collections=['per_epoch'])
+        tensor=test_accuracy_placeholder)
 
     saver = tf.train.Saver(max_to_keep=0)
 
     if to_load_dataset:
         load_datasets(CURRENT_DATASET)
         print_log(to_log, 'dataset loaded')
+
+    if train_on_full_dataset:
+        train_dataset = 1
+    else:
+        train_dataset = 2
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -144,7 +149,7 @@ def train(
             print_log(to_log, '\nstart at epoch {}', i_epoch)
 
             timer.start()
-            for batch in batch_iterator(CURRENT_DATASET, 1, vdcnn.batch_size):
+            for batch in batch_iterator(CURRENT_DATASET, train_dataset, vdcnn.batch_size):
                 feed_dict = {
                     vdcnn.network_input: batch[0],
                     vdcnn.correct_labels: batch[1],
@@ -187,20 +192,20 @@ def train(
                         summary_writer.add_summary(summary_str, train_samples_cnt)
                         summary_writer.flush()
 
-                if to_validate and i_epoch > 18:
+                if to_validate and i_epoch >= validate_start_epoch:
                     feed_dict[vdcnn.is_training] = False
                     validation_accuracy = calc_accuracy(sess=sess,
                                                         accuracy=vdcnn.accuracy,
                                                         input_tensor=vdcnn.network_input,
                                                         y_=vdcnn.correct_labels,
                                                         feed_dict=feed_dict,
-                                                        data_set_type=2)
+                                                        data_set_type=3)
                     # Write summary
                     summary_str = sess.run(validation_summary, feed_dict={validation_accuracy_placeholder: validation_accuracy})
-                    summary_writer.add_summary(summary_str, train_samples_cnt)
+                    summary_writer.add_summary(summary_str, train_samples_cnt + 1)
                     summary_writer.flush()
 
-                    if (validation_accuracy - best_validation_accuracy) > -2e-2:
+                    if (validation_accuracy - best_validation_accuracy) > -1e-2:
                         if validation_accuracy > best_validation_accuracy:
                             best_validation_accuracy = validation_accuracy
 
@@ -213,7 +218,7 @@ def train(
                             data_set_type=0)
 
                         summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
-                        summary_writer.add_summary(summary_str, train_samples_cnt)
+                        summary_writer.add_summary(summary_str, train_samples_cnt + 2)
                         summary_writer.flush()
 
                         if test_accuracy > best_accuracy:
@@ -239,7 +244,7 @@ def train(
             print_log(to_log, 'test accuracy: {}', test_accuracy)
 
             summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
-            summary_writer.add_summary(summary_str, train_samples_cnt)
+            summary_writer.add_summary(summary_str, train_samples_cnt + 3)
             summary_writer.flush()
 
             if to_save_all or (to_save_last and i_epoch == last_epoch + epoch_cnt):

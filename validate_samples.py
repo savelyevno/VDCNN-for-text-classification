@@ -62,7 +62,7 @@ def validate_samples(model_name, test_epoch, dataset_type):
     wrong_sample_ids = get_wrong_sample_ids(model_name, test_epoch, dataset_type)
 
     text_data = []
-    for arr in LOADED_DATASETS['ag_news'][3][0]:
+    for arr in LOADED_DATASETS['ag_news'][dataset_type][0]:
         text = ""
         for x in arr:
             if x == PADDING_TOKEN:
@@ -74,12 +74,12 @@ def validate_samples(model_name, test_epoch, dataset_type):
     for i, pred_class, confd in wrong_sample_ids:
         data.append({
             'confidence': round(confd, 3),
-            'correct class': DATASET_CLASS_NAMES['ag_news'][np.argmax(LOADED_DATASETS['ag_news'][3][1][i]) + 1],
+            'correct class': DATASET_CLASS_NAMES['ag_news'][np.argmax(LOADED_DATASETS['ag_news'][dataset_type][1][i]) + 1],
             'text': str(text_data[i]),
             'predicted class': DATASET_CLASS_NAMES['ag_news'][pred_class]
         })
 
-    with open('wrong_samples.csv', 'w') as file:
+    with open('wrong_samples_' + model_name + '.csv', 'w') as file:
         fieldnames = ['confidence', 'predicted class', 'correct class', 'text']
         writer = csv.DictWriter(file, fieldnames, delimiter='\t')
         writer.writeheader()
@@ -87,4 +87,4 @@ def validate_samples(model_name, test_epoch, dataset_type):
 
 
 if __name__ == '__main__':
-    validate_samples('2018-04-10 15:53:55', 14, 3)
+    validate_samples('2018-04-16 15:23:21', 13, 3)

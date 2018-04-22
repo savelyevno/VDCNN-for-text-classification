@@ -15,13 +15,11 @@ def save_args(args):
         pickle.dump(args, file)
 
 
-def test(model_name, test_epoch, to_log=True):
+def test(model_name, test_epoch, dataset=0, to_log=True):
     _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
     save_args(func_args)
 
-    dataset = 3
-
-    load_dataset('ag_news', dataset)
+    load_dataset(CURRENT_DATASET, dataset)
 
     print_log(to_log, 'dataset loaded')
 
@@ -38,18 +36,12 @@ def test(model_name, test_epoch, to_log=True):
             test_epoch=test_epoch
         )
 
-        # vdcnn.load_old(
-        #     sess=sess,
-        #     model_name=model_name,
-        #     test_epoch=test_epoch
-        # )
-
         timer.start()
         print_log(to_log, 'start testing after epoch {}', str(test_epoch))
 
         accuracy = 0
         step = 0
-        batch_size = 100
+        batch_size = 128
         for batch in batch_iterator(CURRENT_DATASET, dataset, batch_size, False):
             feed_dict = {
                 vdcnn.network_input: batch[0],
@@ -64,11 +56,7 @@ def test(model_name, test_epoch, to_log=True):
             accuracy = (accuracy * batch_size * step + batch_accuracy * actual_batch_size) / \
                        (batch_size * step + actual_batch_size)
 
-            step += 1
-            if step % 10 == 0:
-                print_log(to_log, '{}th batch done, current accuracy {}', step, accuracy)
-
         print_log(to_log, 'testing done in {}', timer.stop())
-        print_log(to_log, 'test error: {}', (1 - accuracy))
+        print_log(to_log, 'accuracy: {}; error: {}', accuracy, (1 - accuracy))
 
     return accuracy
