@@ -9,9 +9,10 @@ def batch_iterator(dataset_name, sample_type, batch_size, is_random=True):
     :param dataset_name:
     :type dataset_name:
     :param sample_type:     0: test,
-                            1: train,
-                            2: validation1 (intersects with test set),
-                            3: validation2 (subset of train set, but does not intersect with it)
+                            1: full train set,
+                            2: train set without validation part,
+                            3: validation1 (intersects with test set),
+                            4: validation2 (subset of train set, but does not intersect with it)
     :type sample_type:
     :param batch_size:
     :type batch_size:

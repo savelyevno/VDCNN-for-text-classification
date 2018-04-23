@@ -7,17 +7,20 @@ from tensorflow.python.ops import control_flow_ops
 
 class VDCNN:
     def __init__(self,
-                 max_st_dev=1e-2,
-                 reg_coef=0.0,
-                 learn_rate=1e-2,
+                 max_st_dev=1.0,
+                 # max_st_dev=1e-2,
+                 reg_coef=1e-4,
+                 # reg_coef=0.0,
+                 learn_rate=9e-3,
+                 # learn_rate=1e-2,
                  lr_decay_rate=0.5,
                  lr_decay_freq=2,
                  batch_size=128,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],
-                 conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
+                 # conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
                  # conv_block_cnts=[2, 2, 2, 2],      # 17 convolutional layers
-                 # conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
+                 conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
                  hidden_layers_cnt=2048,
                  k_max_pool_cnt=8,
                  use_dropout=False,
@@ -359,8 +362,8 @@ class VDCNN:
 
     def load(self, sess, model_name, test_epoch):
         saver = tf.train.import_meta_graph('checkpoints/' + model_name + '/model-0.meta')
-        # saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(test_epoch))
-        saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(test_epoch))
+        saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(test_epoch))
+        # saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(test_epoch))
 
         graph = tf.get_default_graph()
 

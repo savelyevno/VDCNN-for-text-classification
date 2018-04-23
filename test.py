@@ -39,10 +39,9 @@ def test(model_name, test_epoch, dataset=0, to_log=True):
         timer.start()
         print_log(to_log, 'start testing after epoch {}', str(test_epoch))
 
-        accuracy = 0
-        step = 0
-        batch_size = 128
-        for batch in batch_iterator(CURRENT_DATASET, dataset, batch_size, False):
+        cnt = 0
+        sm = 0
+        for batch in batch_iterator(CURRENT_DATASET, dataset, 128, False):
             feed_dict = {
                 vdcnn.network_input: batch[0],
                 vdcnn.correct_labels: batch[1],
@@ -52,11 +51,12 @@ def test(model_name, test_epoch, dataset=0, to_log=True):
 
             batch_accuracy = sess.run(vdcnn.accuracy, feed_dict=feed_dict)
 
-            actual_batch_size = batch[0].shape[0]
-            accuracy = (accuracy * batch_size * step + batch_accuracy * actual_batch_size) / \
-                       (batch_size * step + actual_batch_size)
+            batch_size = batch[0].shape[0]
+            cnt += batch_size
+            sm += batch_size * batch_accuracy
+        acc = sm / cnt
 
         print_log(to_log, 'testing done in {}', timer.stop())
-        print_log(to_log, 'accuracy: {}; error: {}', accuracy, (1 - accuracy))
+        print_log(to_log, 'accuracy: {}; error: {}', acc, (1 - acc))
 
-    return accuracy
+    return acc

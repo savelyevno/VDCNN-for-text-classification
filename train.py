@@ -33,18 +33,17 @@ def load_checkpoint_path(model_name):
 
 
 def calc_accuracy(sess, accuracy, input_tensor, y_, feed_dict, data_set_type):
-    acc = 0
-    step = 0
+    sm = 0
+    cnt = 0
     for batch in batch_iterator(CURRENT_DATASET, data_set_type, 128, False):
-        batch_size = batch[0].shape[0]
-
         feed_dict[input_tensor] = batch[0]
         feed_dict[y_] = batch[1]
-        batch_val_acc = sess.run(accuracy, feed_dict=feed_dict)
+        batch_acc = sess.run(accuracy, feed_dict=feed_dict)
 
-        # Updating average accuracy
-        acc = (acc * step * 128 + batch_val_acc * batch_size) / (step * 128 + batch_size)
-        step += 1
+        batch_size = batch[0].shape[0]
+        cnt += batch_size
+        sm += batch_acc * batch_size
+    acc = sm / cnt
 
     return acc
 
