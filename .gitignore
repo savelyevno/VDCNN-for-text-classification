@@ -7,3 +7,4 @@ metadata/test_params_last_args.pkl
 metadata/train_last_args.pkl
 tensorboard.sh
 *.pyc
+*.csv

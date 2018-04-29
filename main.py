@@ -71,7 +71,7 @@ def start_train(to_continue, model_name='', last_epoch=0):
                   model_name=model_name,
                   last_epoch=last_epoch,
                   to_validate=True,
-                  validate_start_epoch=7,
+                  validate_start_epoch=15,
                   train_on_full_dataset=False)
 
 

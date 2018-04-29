@@ -24,7 +24,7 @@ def get_wrong_sample_ids(model_name, test_epoch, dataset_type):
         vdcnn.load(
             sess=sess,
             model_name=model_name,
-            test_epoch=test_epoch
+            epoch=test_epoch
         )
 
         batch_size = 100

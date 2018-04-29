@@ -11,8 +11,8 @@ class VDCNN:
                  # max_st_dev=1e-2,
                  reg_coef=1e-4,
                  # reg_coef=0.0,
-                 learn_rate=9e-3,
-                 # learn_rate=1e-2,
+                 # learn_rate=8e-3,
+                 learn_rate=1e-2,
                  lr_decay_rate=0.5,
                  lr_decay_freq=2,
                  batch_size=128,
@@ -344,9 +344,15 @@ class VDCNN:
                 decay_rate=self.lr_decay_rate,
                 staircase=True,
                 name='learning_rate')
-            self.train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
+            self.train_step = tf.contrib.layers.optimize_loss(
                 loss=self.loss,
-                global_step=self.global_step)
+                global_step=self.global_step,
+                learning_rate=self.learning_rate,
+                optimizer='Adam',
+                summaries=['gradients'])
+            # self.train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
+            #     loss=self.loss,
+            #     global_step=self.global_step)
 
         self.are_predictions_correct = tf.cast(
             x=tf.equal(
@@ -360,9 +366,9 @@ class VDCNN:
             name='are_predictions_correct')
         self.accuracy = tf.reduce_mean(self.are_predictions_correct, name='accuracy')
 
-    def load(self, sess, model_name, test_epoch):
+    def load(self, sess, model_name, epoch):
         saver = tf.train.import_meta_graph('checkpoints/' + model_name + '/model-0.meta')
-        saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(test_epoch))
+        saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(epoch))
         # saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(test_epoch))
 
         graph = tf.get_default_graph()
@@ -373,6 +379,8 @@ class VDCNN:
         self.keep_prob = graph.get_tensor_by_name('keep_prob:0')
         self.is_training = graph.get_tensor_by_name('is_training:0')
         self.accuracy = graph.get_tensor_by_name('accuracy:0')
+        self.k_max_pool_reshape = graph.get_tensor_by_name('k_max_pool/reshape:0')
+        self.fc2_relu = graph.get_tensor_by_name('fc_2/Relu:0')
 
     def load_old(self, sess, model_name, test_epoch):
         saver = tf.train.import_meta_graph('checkpoints/' + model_name + '/model-0.meta')

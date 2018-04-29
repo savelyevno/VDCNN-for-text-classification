@@ -33,7 +33,7 @@ def test(model_name, test_epoch, dataset=0, to_log=True):
         vdcnn.load(
             sess=sess,
             model_name=model_name,
-            test_epoch=test_epoch
+            epoch=test_epoch
         )
 
         timer.start()
