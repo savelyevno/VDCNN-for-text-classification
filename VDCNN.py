@@ -1,6 +1,5 @@
 import tensorflow as tf
-from consts import TEXT_SIZE, EMBEDDING_SIZE, CURRENT_DATASET, DATASET_NCLASSES, ALPHABET_DICT, EMBEDDING_GEN_SEED, \
-    DATASET_SIZE
+from consts import TEXT_SIZE, EMBEDDING_SIZE, CURRENT_DATASET, DATASET_NCLASSES, ALPHABET_DICT, EMBEDDING_GEN_SEED
 import numpy as np
 from tensorflow.python.ops import control_flow_ops
 
@@ -15,7 +14,6 @@ class VDCNN:
                  learn_rate=1e-2,
                  lr_decay_rate=0.5,
                  lr_decay_freq=2,
-                 batch_size=128,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],
                  # conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
@@ -23,22 +21,19 @@ class VDCNN:
                  conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
                  hidden_layers_cnt=2048,
                  k_max_pool_cnt=8,
-                 use_dropout=False,
-                 data_set_name=CURRENT_DATASET):
+                 use_dropout=False):
 
         self.max_st_dev = max_st_dev
         self.reg_coef = reg_coef
         self.learn_rate = learn_rate
         self.lr_decay_rate = lr_decay_rate
         self.lr_decay_freq = lr_decay_freq
-        self.batch_size = batch_size
         self.embedding_size = embedding_size
         self.feature_cnts = feature_cnts
         self.conv_block_cnts = conv_block_cnts
         self.hidden_layers_cnt = hidden_layers_cnt
         self.k_max_pool_cnt = k_max_pool_cnt
         self.use_dropout = use_dropout
-        self.data_set_name = data_set_name
 
         self.params_cnt = 0
 
@@ -184,7 +179,7 @@ class VDCNN:
             dtype=tf.int32)
 
         self.correct_labels = tf.placeholder(
-            shape=(None, DATASET_NCLASSES[self.data_set_name]),
+            shape=(None, DATASET_NCLASSES[CURRENT_DATASET]),
             name='correct_labels',
             dtype=tf.int32)
 
@@ -306,10 +301,10 @@ class VDCNN:
 
         with tf.variable_scope('fc_3'):
             W_fc3 = self._weight_variable(
-                shape=(self.hidden_layers_cnt, DATASET_NCLASSES[self.data_set_name]),
+                shape=(self.hidden_layers_cnt, DATASET_NCLASSES[CURRENT_DATASET]),
                 st_dev=np.sqrt(2 / self.hidden_layers_cnt))
             W_fc3_loss = tf.nn.l2_loss(W_fc3)
-            b_fc3 = self._bias_variable([DATASET_NCLASSES[self.data_set_name]])
+            b_fc3 = self._bias_variable([DATASET_NCLASSES[CURRENT_DATASET]])
 
             self.h.append(
                 tf.add(tf.matmul(a=self.h[-1], b=W_fc3), b_fc3, name='predictions'))
@@ -331,28 +326,6 @@ class VDCNN:
         self.loss = self.cross_entropy + self.reg_loss
         # self.loss = self.cross_entropy
 
-        self.global_step = tf.Variable(
-            initial_value=0,
-            trainable=False,
-            dtype=tf.int32,
-            name='global_step')
-        with tf.name_scope('adam_optimizer'):
-            self.learning_rate = tf.train.exponential_decay(
-                learning_rate=self.learn_rate,
-                global_step=self.global_step,
-                decay_steps=self.lr_decay_freq * (DATASET_SIZE[self.data_set_name] / self.batch_size),
-                decay_rate=self.lr_decay_rate,
-                staircase=True,
-                name='learning_rate')
-            self.train_step = tf.contrib.layers.optimize_loss(
-                loss=self.loss,
-                global_step=self.global_step,
-                learning_rate=self.learning_rate,
-                optimizer='Adam',
-                summaries=['gradients'])
-            # self.train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-            #     loss=self.loss,
-            #     global_step=self.global_step)
 
         self.are_predictions_correct = tf.cast(
             x=tf.equal(
@@ -381,24 +354,6 @@ class VDCNN:
         self.accuracy = graph.get_tensor_by_name('accuracy:0')
         self.k_max_pool_reshape = graph.get_tensor_by_name('k_max_pool/reshape:0')
         self.fc2_relu = graph.get_tensor_by_name('fc_2/Relu:0')
-
-    def load_old(self, sess, model_name, test_epoch):
-        saver = tf.train.import_meta_graph('checkpoints/' + model_name + '/model-0.meta')
-        saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(test_epoch))
-
-        graph = tf.get_default_graph()
-
-        # x = graph.get_tensor_by_name('x:0')
-        # y_ = graph.get_tensor_by_name('y_:0')
-        # keep_prob = graph.get_tensor_by_name('keep_prob:0')
-        # is_training = graph.get_tensor_by_name('is_training:0')
-        # accuracy_op = graph.get_tensor_by_name('accuracy_1:0')
-
-        self.network_input = graph.get_tensor_by_name('x:0')
-        self.correct_labels = graph.get_tensor_by_name('y_:0')
-        self.keep_prob = graph.get_tensor_by_name('keep_prob:0')
-        self.is_training = graph.get_tensor_by_name('is_training:0')
-        self.accuracy = graph.get_tensor_by_name('accuracy_1:0')
 
     def set_params(self, params):
         for name, value in params.items():

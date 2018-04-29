@@ -171,9 +171,6 @@ DATASET_COLUMNS = {
     'dbpedia': [0, 2],
     'ag_news': [0, 2],
 }
-DATASET_SIZE = {
-    'ag_news': 120000 * (1 - VALIDATION_TRAIN_DATASET_SIZE_RATIO)
-}
 
 DATASET_CLASS_NAMES = {
     'ag_news': {
