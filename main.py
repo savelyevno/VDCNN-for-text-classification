@@ -3,6 +3,8 @@ import argparse
 import pickle
 
 from train import train
+from train_by_disagreement import train_by_disagreement
+from test_disagreement import test_disagreement
 from test import test
 from test_params import test_params
 from NetworkParams import NetworkParams
@@ -67,12 +69,18 @@ def start_train(to_continue, model_name='', last_epoch=0):
                 last_args = pickle.load(file)
             train(graph, **last_args)
         else:
-            train(graph,
-                  model_name=model_name,
-                  last_epoch=last_epoch,
-                  to_validate=True,
-                  validate_start_epoch=15,
-                  train_on_full_dataset=False)
+            # train(graph,
+            #       model_name=model_name,
+            #       last_epoch=last_epoch,
+            #       to_validate=True,
+            #       validate_start_epoch=15,
+            #       train_on_full_dataset=False)
+            train_by_disagreement(graph,
+                                  model_name=model_name,
+                                  last_epoch=last_epoch,
+                                  to_validate=True,
+                                  validate_start_epoch=9,
+                                  train_on_full_dataset=False)
 
 
 def start_test(to_continue, model_name=None, test_epoch=None):
@@ -81,7 +89,8 @@ def start_test(to_continue, model_name=None, test_epoch=None):
             last_args = pickle.load(file)
         test(**last_args)
     else:
-        test(model_name, test_epoch, 0)
+        # test(model_name, test_epoch, 0)
+        test_disagreement(model_name, test_epoch, 0)
 
 
 def start_test_params(to_continue):

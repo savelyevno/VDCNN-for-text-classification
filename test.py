@@ -15,7 +15,7 @@ def save_args(args):
         pickle.dump(args, file)
 
 
-def test(model_name, test_epoch, dataset=0, to_log=True):
+def test(model_name, test_epoch, dataset=0, to_log=True, model_id=None):
     _, _, _, func_args = inspect.getargvalues(inspect.currentframe())
     save_args(func_args)
 

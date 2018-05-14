@@ -100,10 +100,14 @@ def save_datasets(dataset_name):
     after_seed = np.random.randint(1 << 30)
     np.random.seed(0)
     val_train_perm = np.random.permutation(N)[: int(N * VALIDATION_TRAIN_DATASET_SIZE_RATIO)]
+    val_train_perm_small = np.random.permutation(len(val_train_perm))[: 1000]
     np.random.seed(after_seed)
 
     with open(processed_datasets_folder + dataset_name + '/vld_train.pkl', 'wb') as file:
         pickle.dump((X[val_train_perm], Y[val_train_perm]), file)
+
+    with open(processed_datasets_folder + dataset_name + '/vld_train_small.pkl', 'wb') as file:
+        pickle.dump((X[val_train_perm_small], Y[val_train_perm_small]), file)
 
     with open(processed_datasets_folder + dataset_name + '/partial_train.pkl', 'wb') as file:
         pickle.dump((np.delete(X, val_train_perm, axis=0), np.delete(Y, val_train_perm, axis=0)), file)

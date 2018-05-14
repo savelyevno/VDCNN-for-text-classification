@@ -6,19 +6,19 @@ from tensorflow.python.ops import control_flow_ops
 
 class VDCNN:
     def __init__(self,
-                 max_st_dev=1.0,
-                 # max_st_dev=1e-2,
-                 reg_coef=1e-4,
-                 # reg_coef=0.0,
+                 # max_st_dev=1.0,
+                 max_st_dev=1e-2,
+                 # reg_coef=1e-4,
+                 reg_coef=0.0,
                  # learn_rate=8e-3,
                  learn_rate=1e-2,
                  lr_decay_rate=0.5,
                  lr_decay_freq=2,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],
-                 # conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
+                 conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
                  # conv_block_cnts=[2, 2, 2, 2],      # 17 convolutional layers
-                 conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
+                 # conv_block_cnts=[2, 2, 5, 5],      # 29 convolutional layers
                  hidden_layers_cnt=2048,
                  k_max_pool_cnt=8,
                  use_dropout=False):
@@ -313,19 +313,23 @@ class VDCNN:
 
         self.predictions = self.h[-1]
 
+        self.predicted_classes = tf.argmax(self.predictions, axis=1, name='predicted_classes')
+
         #
         #   evaluation
         #
 
-        self.cross_entropy = tf.reduce_mean(
-            input_tensor=tf.nn.softmax_cross_entropy_with_logits(
-                labels=self.correct_labels,
-                logits=self.predictions),
+        self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+            labels=self.correct_labels,
+            logits=self.predictions,
+            name='cross_entropy')
+        self.reduced_cross_entropy = tf.reduce_mean(
+            input_tensor=self.cross_entropy,
             name='reduced_cross_entropy')
-        self.reg_loss = tf.constant(self.reg_coef) * self.fc_loss
-        self.loss = self.cross_entropy + self.reg_loss
-        # self.loss = self.cross_entropy
 
+        self.reg_loss = tf.constant(self.reg_coef) * self.fc_loss
+        self.loss = self.reduced_cross_entropy + self.reg_loss
+        # self.loss = self.cross_entropy
 
         self.are_predictions_correct = tf.cast(
             x=tf.equal(
@@ -339,21 +343,22 @@ class VDCNN:
             name='are_predictions_correct')
         self.accuracy = tf.reduce_mean(self.are_predictions_correct, name='accuracy')
 
-    def load(self, sess, model_name, epoch):
+    def load(self, sess, model_name, epoch, var_scope=''):
         saver = tf.train.import_meta_graph('checkpoints/' + model_name + '/model-0.meta')
         saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(epoch))
-        # saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(test_epoch))
+        # saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(epoch))
 
         graph = tf.get_default_graph()
 
-        self.network_input = graph.get_tensor_by_name('network_input:0')
-        self.predictions = graph.get_tensor_by_name('fc_3/predictions:0')
-        self.correct_labels = graph.get_tensor_by_name('correct_labels:0')
-        self.keep_prob = graph.get_tensor_by_name('keep_prob:0')
-        self.is_training = graph.get_tensor_by_name('is_training:0')
-        self.accuracy = graph.get_tensor_by_name('accuracy:0')
-        self.k_max_pool_reshape = graph.get_tensor_by_name('k_max_pool/reshape:0')
-        self.fc2_relu = graph.get_tensor_by_name('fc_2/Relu:0')
+        self.network_input = graph.get_tensor_by_name(var_scope + 'network_input:0')
+        self.predictions = graph.get_tensor_by_name(var_scope + 'fc_3/predictions:0')
+        self.predicted_classes = graph.get_tensor_by_name(var_scope + 'predicted_classes:0')
+        self.correct_labels = graph.get_tensor_by_name(var_scope + 'correct_labels:0')
+        self.keep_prob = graph.get_tensor_by_name(var_scope + 'keep_prob:0')
+        self.is_training = graph.get_tensor_by_name(var_scope + 'is_training:0')
+        self.accuracy = graph.get_tensor_by_name(var_scope + 'accuracy:0')
+        self.k_max_pool_reshape = graph.get_tensor_by_name(var_scope + 'k_max_pool/reshape:0')
+        self.fc2_relu = graph.get_tensor_by_name(var_scope + 'fc_2/Relu:0')
 
     def set_params(self, params):
         for name, value in params.items():
