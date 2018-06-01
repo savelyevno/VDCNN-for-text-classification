@@ -4,9 +4,10 @@ import os
 import datetime
 import inspect
 import pickle
+import numpy as np
 
 from preprocess_data import load_datasets, LOADED_DATASETS
-from consts import CURRENT_DATASET
+from consts import CURRENT_DATASET, TEXT_SIZE, DATASET_NCLASSES
 from Timer import timer
 from get_data import batch_iterator
 from VDCNN import VDCNN
@@ -55,6 +56,9 @@ def train_by_disagreement(
         model_name='',
         epoch_cnt=50,
         batch_size=128,
+        initial_lr=1e-2,
+        lr_after_init=1e-3,
+        lr_decay_freq=2,
         to_save_all=True,
         to_save_last=False,
         to_log=True,
@@ -76,70 +80,77 @@ def train_by_disagreement(
 
     epoch_steps_cnt = LOADED_DATASETS[CURRENT_DATASET][train_dataset][0].shape[0] / batch_size
 
+    global_step_vars = []
     vdcnns = []
     with tf.variable_scope('net1'):
         vdcnns.append(VDCNN())
         vdcnns[0].build()
 
-        global_step_var1 = tf.Variable(
+        global_step_vars.append(tf.Variable(
             initial_value=0,
             trainable=False,
             dtype=tf.int32,
-            name='global_step')
+            name='global_step'))
     with tf.variable_scope('net2'):
         vdcnns.append(VDCNN())
         vdcnns[1].build()
 
-        global_step_var2 = tf.Variable(
+        global_step_vars.append(tf.Variable(
             initial_value=0,
             trainable=False,
             dtype=tf.int32,
-            name='global_step')
+            name='global_step'))
 
     to_update = tf.stop_gradient(tf.to_float(tf.logical_or(
         x=tf.not_equal(vdcnns[0].predicted_classes, vdcnns[1].predicted_classes),
         y=tf.less(
-            x=tf.to_float(global_step_var1),
+            x=tf.to_float(global_step_vars[0]),
             y=init_epoch_cnt*epoch_steps_cnt))))
     to_update_ratio = tf.reduce_mean(to_update)
-    
-    with tf.variable_scope('net1'):
-        loss_to_update1 = tf.reduce_sum((vdcnns[0].cross_entropy + vdcnns[0].reg_loss) * to_update) / \
-            tf.maximum(batch_size * 0.1, tf.reduce_sum(to_update))
 
-        learning_rate1 = tf.train.exponential_decay(
-            learning_rate=vdcnns[0].learn_rate,
-            global_step=global_step_var1,
-            decay_steps=vdcnns[0].lr_decay_freq * epoch_steps_cnt,
-            decay_rate=vdcnns[0].lr_decay_rate,
-            staircase=True,
-            name='learning_rate')
-        
-        train_step1 = tf.contrib.layers.optimize_loss(
+    train_steps = []
+
+    with tf.variable_scope('net1'):
+        loss_to_update1 = tf.div(tf.reduce_sum((vdcnns[0].cross_entropy + vdcnns[0].reg_loss) * to_update),
+                                 tf.maximum(batch_size * 0.1, tf.reduce_sum(to_update)), name='loss_to_update')
+
+        # learning_rate1 = tf.train.exponential_decay(
+        #     learning_rate=vdcnns[0].learn_rate,
+        #     global_step=global_step_vars[0],
+        #     decay_steps=vdcnns[0].lr_decay_freq * epoch_steps_cnt,
+        #     decay_rate=vdcnns[0].lr_decay_rate,
+        #     staircase=True,
+        #     name='learning_rate')
+        learning_rate1_var = tf.Variable(initial_lr, trainable=False, name='learning_rate_var')
+        learning_rate1 = tf.convert_to_tensor(learning_rate1_var, name='learning_rate')
+
+        train_steps.append(tf.contrib.layers.optimize_loss(
             loss=loss_to_update1,
-            global_step=global_step_var1,
+            global_step=global_step_vars[0],
             learning_rate=learning_rate1,
             optimizer='Adam',
-            summaries=['gradients'])
+            summaries=['gradients']))
         
     with tf.variable_scope('net2'):
-        loss_to_update2 = tf.reduce_sum((vdcnns[1].cross_entropy + vdcnns[1].reg_loss) * to_update) / \
-                          tf.maximum(batch_size * 0.1, tf.reduce_sum(to_update))
+        loss_to_update2 = tf.div(tf.reduce_sum((vdcnns[1].cross_entropy + vdcnns[1].reg_loss) * to_update),
+                                 tf.maximum(batch_size * 0.1, tf.reduce_sum(to_update)), name='loss_to_update')
 
-        learning_rate2 = tf.train.exponential_decay(
-            learning_rate=vdcnns[1].learn_rate,
-            global_step=global_step_var2,
-            decay_steps=vdcnns[1].lr_decay_freq * epoch_steps_cnt,
-            decay_rate=vdcnns[1].lr_decay_rate,
-            staircase=True,
-            name='learning_rate')
+        # learning_rate2 = tf.train.exponential_decay(
+        #     learning_rate=vdcnns[1].learn_rate,
+        #     global_step=global_step_vars[1],
+        #     decay_steps=vdcnns[1].lr_decay_freq * epoch_steps_cnt,
+        #     decay_rate=vdcnns[1].lr_decay_rate,
+        #     staircase=True,
+        #     name='learning_rate')
+        learning_rate2_var = tf.Variable(initial_lr, trainable=False, name='learning_rate_var')
+        learning_rate2 = tf.convert_to_tensor(learning_rate2_var, name='learning_rate')
 
-        train_step2 = tf.contrib.layers.optimize_loss(
+        train_steps.append(tf.contrib.layers.optimize_loss(
             loss=loss_to_update2,
-            global_step=global_step_var2,
+            global_step=global_step_vars[1],
             learning_rate=learning_rate2,
             optimizer='Adam',
-            summaries=['gradients'])
+            summaries=['gradients']))
 
     average_loss = (vdcnns[0].loss + vdcnns[1].loss) / 2
     average_reg_loss = (vdcnns[0].reg_loss + vdcnns[1].reg_loss) / 2
@@ -170,7 +181,7 @@ def train_by_disagreement(
     for i_vdcnn in range(2):
         validation_accuracy_placeholders.append(tf.placeholder(tf.float32))
         validation_summaries.append(tf.summary.scalar(
-            name='validation_accuracy' + str(i_vdcnn + 1),
+            name='vld1_accuracy' + str(i_vdcnn + 1),
             tensor=validation_accuracy_placeholders[i_vdcnn]))
 
     # Test summary; is written after every epoch
@@ -186,7 +197,7 @@ def train_by_disagreement(
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    config.gpu_options.visible_device_list = "1"
+    config.gpu_options.visible_device_list = "0"
     with tf.Session(graph=graph, config=config) as sess:
         # We start a new evaluation in case last_epoch=0 and load previous otherwise
         if last_epoch != 0:
@@ -206,7 +217,8 @@ def train_by_disagreement(
         global_step = 0
         train_samples_cnt = 0
         best_accuracy = 0
-        best_validation_accuracy = 0
+        best_vld1_accuracy = 0
+        best_vld2_accuracy = 0
         timer.start()
 
         print_log(to_log, 'start training...')
@@ -215,30 +227,75 @@ def train_by_disagreement(
             timer.start()
             print_log(to_log, '\nstart at epoch {}', i_epoch)
 
+            #
+            # update lr by hand
+            #
+            # if i_epoch <= init_epoch_cnt:
+            #     lr_decay_cnt = (i_epoch - 1)//lr_decay_freq
+            #     new_lr = initial_lr / 2 ** lr_decay_cnt
+            # else:
+            #     lr_decay_cnt = (i_epoch - init_epoch_cnt - 1) // lr_decay_freq
+            #     new_lr = lr_after_init / 2 ** lr_decay_cnt
+            lr_decay_cnt = (i_epoch - 1) // lr_decay_freq
+            new_lr = initial_lr / 2 ** lr_decay_cnt
+
+            lr1_upd_op = learning_rate1_var.assign(new_lr)
+            sess.run(lr1_upd_op)
+
+            lr2_upd_op = learning_rate2_var.assign(new_lr)
+            sess.run(lr2_upd_op)
+
+            # if i_epoch <= init_epoch_cnt:
+            #     batch_seq1 = list(batch_iterator(CURRENT_DATASET, 5, batch_size))
+            #     batch_seq2 = list(batch_iterator(CURRENT_DATASET, 6, batch_size))
+            #     assert len(batch_seq1) == len(batch_seq2)
+            #     batches_cnt = len(batch_seq1)
+            # else:
+            batch_seq = list(batch_iterator(CURRENT_DATASET, train_dataset, batch_size))
+            batches_cnt = len(batch_seq)
+
             timer.start()
-            for batch in batch_iterator(CURRENT_DATASET, train_dataset, batch_size):
+            for batch_i in range(batches_cnt):
                 feed_dict = {}
-                for vdcnn in vdcnns:
-                    feed_dict[vdcnn.network_input] = batch[0]
-                    feed_dict[vdcnn.correct_labels] = batch[1]
-                    feed_dict[vdcnn.keep_prob] = 0.5
-                    feed_dict[vdcnn.is_training] = True
+                for i in range(2):
+                    vdcnn = vdcnns[i]
+                    if i_epoch <= init_epoch_cnt:
+                        # batch1 = batch_seq1[batch_i]
+                        # batch2 = batch_seq2[batch_i]
+                        batch1 = batch_seq[batch_i]
+                        batch2 = batch_seq[batch_i]
+                        if i == 0:
+                            feed_dict[vdcnn.network_input] = batch1[0]
+                            feed_dict[vdcnn.correct_labels] = batch1[1]
+                            feed_dict[vdcnn.keep_prob] = 0.5
+                            feed_dict[vdcnn.is_training] = True
+                        else:
+                            feed_dict[vdcnn.network_input] = batch2[0]
+                            feed_dict[vdcnn.correct_labels] = batch2[1]
+                            feed_dict[vdcnn.keep_prob] = 0.5
+                            feed_dict[vdcnn.is_training] = True
+                    else:
+                        batch = batch_seq[batch_i]
+                        feed_dict[vdcnn.network_input] = batch[0]
+                        feed_dict[vdcnn.correct_labels] = batch[1]
+                        feed_dict[vdcnn.keep_prob] = 0.5
+                        feed_dict[vdcnn.is_training] = True
 
                 if (global_step + 1) % 100 != 0:
                     _, _, _, global_step = sess.run([
-                            train_step1,
-                            train_step2,
-                            global_step_var1,
-                            global_step_var2],
+                            train_steps[0],
+                            train_steps[1],
+                            global_step_vars[0],
+                            global_step_vars[1]],
                         feed_dict=feed_dict)
                     train_samples_cnt = global_step * batch_size
                 else:
                     _, _, _, global_step, loss, train_accuracy, summary_str, lr, reg_loss = sess.run(
                         [
-                            train_step1,
-                            train_step2,
-                            global_step_var1,
-                            global_step_var2,
+                            train_steps[0],
+                            train_steps[1],
+                            global_step_vars[0],
+                            global_step_vars[1],
                             average_loss,
                             average_accuracy,
                             summary,
@@ -250,10 +307,10 @@ def train_by_disagreement(
                     print_log(to_log,
                               '\ttrain samples cnt: {}, avg. train acc. {}, avg. loss {}, avg. reg loss {}, lr: {}; dt = {}',
                               train_samples_cnt,
-                              train_accuracy,
-                              loss,
-                              reg_loss,
-                              lr,
+                              str(round(train_accuracy, 3)),
+                              str(round(loss, 3)),
+                              str(round(reg_loss, 5)),
+                              str(round(lr, 10)),
                               timer.stop_start())
 
                     # Write summary
@@ -266,37 +323,37 @@ def train_by_disagreement(
                         vdcnn = vdcnns[i_vdcnn]
 
                         feed_dict[vdcnn.is_training] = False
-                        validation_accuracy = calc_accuracy(sess=sess,
-                                                            accuracy=vdcnn.accuracy,
-                                                            input_tensor=vdcnn.network_input,
-                                                            y_=vdcnn.correct_labels,
-                                                            feed_dict=feed_dict,
-                                                            data_set_type=3)
+                        vld1_accuracy = calc_accuracy(sess=sess,
+                                                      accuracy=vdcnn.accuracy,
+                                                      input_tensor=vdcnn.network_input,
+                                                      y_=vdcnn.correct_labels,
+                                                      feed_dict=feed_dict,
+                                                      data_set_type=5)
                         # Write summary
-                        summary_str = sess.run(validation_summaries[i_vdcnn], feed_dict={validation_accuracy_placeholders[i_vdcnn]: validation_accuracy})
+                        summary_str = sess.run(validation_summaries[i_vdcnn], feed_dict={validation_accuracy_placeholders[i_vdcnn]: vld1_accuracy})
                         summary_writer.add_summary(summary_str, train_samples_cnt + 1)
                         summary_writer.flush()
 
-                        if (validation_accuracy - best_validation_accuracy) > -1e-2:
-                            if validation_accuracy > best_validation_accuracy:
-                                best_validation_accuracy = validation_accuracy
+                        if (vld1_accuracy - best_vld1_accuracy) > -1e-2:
+                            if vld1_accuracy > best_vld1_accuracy:
+                                best_vld1_accuracy = vld1_accuracy
 
-                            test_accuracy = calc_accuracy(
+                            vld2_accuracy = calc_accuracy(
                                 sess=sess,
                                 accuracy=vdcnn.accuracy,
                                 input_tensor=vdcnn.network_input,
                                 y_=vdcnn.correct_labels,
                                 feed_dict=feed_dict,
-                                data_set_type=0)
+                                data_set_type=4)
 
-                            summary_str = sess.run(test_summaries[i_vdcnn], feed_dict={test_accuracy_placeholders[i_vdcnn]: test_accuracy})
+                            summary_str = sess.run(test_summaries[i_vdcnn], feed_dict={test_accuracy_placeholders[i_vdcnn]: vld2_accuracy})
                             summary_writer.add_summary(summary_str, train_samples_cnt + 2)
                             summary_writer.flush()
 
-                            if test_accuracy > best_accuracy:
-                                best_accuracy = test_accuracy
+                            if vld2_accuracy > best_vld2_accuracy:
+                                best_vld2_accuracy = vld2_accuracy
 
-                                print_log(to_log, '\tbest test{} accuracy update: {}', i_vdcnn + 1, test_accuracy)
+                                print_log(to_log, '\tbest vld2 accuracy update for net{}: {}', i_vdcnn + 1, vld2_accuracy)
 
                                 saver.save(
                                     sess=sess,
@@ -308,17 +365,17 @@ def train_by_disagreement(
                 vdcnn = vdcnns[i_vdcnn]
 
                 feed_dict[vdcnn.is_training] = False
-                test_accuracy = calc_accuracy(
+                vld_accuracy = calc_accuracy(
                     sess=sess,
                     accuracy=vdcnn.accuracy,
                     input_tensor=vdcnn.network_input,
                     y_=vdcnn.correct_labels,
                     feed_dict=feed_dict,
-                    data_set_type=0)
-                best_accuracy = max(best_accuracy, test_accuracy)
-                print_log(to_log, 'test{} accuracy: {}', i_vdcnn + 1, test_accuracy)
+                    data_set_type=4)
+                best_accuracy = max(best_accuracy, vld_accuracy)
+                print_log(to_log, 'validation{} accuracy: {}', i_vdcnn + 1, vld_accuracy)
 
-                summary_str = sess.run(test_summaries[i_vdcnn], feed_dict={test_accuracy_placeholders[i_vdcnn]: test_accuracy})
+                summary_str = sess.run(validation_summaries[i_vdcnn], feed_dict={validation_accuracy_placeholders[i_vdcnn]: vld_accuracy})
                 summary_writer.add_summary(summary_str, train_samples_cnt + 3)
                 summary_writer.flush()
 

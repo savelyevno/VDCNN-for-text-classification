@@ -14,6 +14,7 @@ class VDCNN:
                  learn_rate=1e-2,
                  lr_decay_rate=0.5,
                  lr_decay_freq=2,
+                 # lr_decay_freq=3,
                  embedding_size=16,
                  feature_cnts=[64, 128, 256, 512],
                  conv_block_cnts=[1, 1, 1, 1],      # 9 convolutional layers
@@ -345,8 +346,8 @@ class VDCNN:
 
     def load(self, sess, model_name, epoch, var_scope=''):
         saver = tf.train.import_meta_graph('checkpoints/' + model_name + '/model-0.meta')
-        saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(epoch))
-        # saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(epoch))
+        # saver.restore(sess, 'checkpoints/' + model_name + '/model_best-' + str(epoch))
+        saver.restore(sess, 'checkpoints/' + model_name + '/model-' + str(epoch))
 
         graph = tf.get_default_graph()
 

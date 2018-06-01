@@ -99,18 +99,29 @@ def save_datasets(dataset_name):
     #
     after_seed = np.random.randint(1 << 30)
     np.random.seed(0)
-    val_train_perm = np.random.permutation(N)[: int(N * VALIDATION_TRAIN_DATASET_SIZE_RATIO)]
-    val_train_perm_small = np.random.permutation(len(val_train_perm))[: 1000]
+    val_train_perm = np.random.permutation(N)[: VALIDATION_TRAIN_DATASET_SIZE]
     np.random.seed(after_seed)
 
     with open(processed_datasets_folder + dataset_name + '/vld_train.pkl', 'wb') as file:
         pickle.dump((X[val_train_perm], Y[val_train_perm]), file)
 
-    with open(processed_datasets_folder + dataset_name + '/vld_train_small.pkl', 'wb') as file:
-        pickle.dump((X[val_train_perm_small], Y[val_train_perm_small]), file)
-
+    X = np.delete(X, val_train_perm, axis=0)
+    Y = np.delete(Y, val_train_perm, axis=0)
     with open(processed_datasets_folder + dataset_name + '/partial_train.pkl', 'wb') as file:
-        pickle.dump((np.delete(X, val_train_perm, axis=0), np.delete(Y, val_train_perm, axis=0)), file)
+        pickle.dump((X, Y), file)
+
+    after_seed = np.random.randint(1 << 30)
+    np.random.seed(0)
+    train_part1_perm = np.random.permutation(X.shape[0])[:X.shape[0]//2]
+    np.random.seed(after_seed)
+
+    with open(processed_datasets_folder + dataset_name + '/train_part1.pkl', 'wb') as file:
+        pickle.dump((X[train_part1_perm], Y[train_part1_perm]), file)
+
+    X = np.delete(X, train_part1_perm, axis=0)
+    Y = np.delete(Y, train_part1_perm, axis=0)
+    with open(processed_datasets_folder + dataset_name + '/train_part2.pkl', 'wb') as file:
+        pickle.dump((X, Y), file)
 
 
 def load_datasets(dataset_name):
@@ -143,6 +154,16 @@ def load_datasets(dataset_name):
         X, Y = pickle.load(file)
     LOADED_DATASETS[dataset_name][4] = X, Y
 
+    # validation train small is a subset of previous set (does not intersect with train set)
+    with open(processed_datasets_folder + dataset_name + '/train_part1.pkl', 'rb') as file:
+        X, Y = pickle.load(file)
+    LOADED_DATASETS[dataset_name][5] = X, Y
+
+    # validation train small is a subset of previous set (does not intersect with train set)
+    with open(processed_datasets_folder + dataset_name + '/train_part2.pkl', 'rb') as file:
+        X, Y = pickle.load(file)
+    LOADED_DATASETS[dataset_name][6] = X, Y
+
 
 def load_dataset(dataset_name, dataset_type):
     if dataset_type == 0:
@@ -155,6 +176,10 @@ def load_dataset(dataset_name, dataset_type):
         sample_file = 'vld_test'
     elif dataset_type == 4:
         sample_file = 'vld_train'
+    elif dataset_type == 5:
+        sample_file = 'vld_train_part1'
+    elif dataset_type == 6:
+        sample_file = 'vld_train_part2'
     else:
         raise Exception('Invalid sample type')
 

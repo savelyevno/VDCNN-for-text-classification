@@ -11,7 +11,7 @@ from VDCNN import VDCNN
 from misc import print_log
 
 
-def get_wrong_sample_ids(model_name, test_epoch, dataset_type):
+def run(model_name, test_epoch, dataset_type):
     load_dataset('ag_news', dataset_type)
 
     vdcnn = VDCNN()
@@ -30,6 +30,7 @@ def get_wrong_sample_ids(model_name, test_epoch, dataset_type):
         batch_size = 100
         batch_cnt = -1
         wrong_sample_ids = []
+        results = []
         for batch in batch_iterator(CURRENT_DATASET, dataset_type, batch_size, False):
             batch_cnt += 1
             feed_dict = {
@@ -48,18 +49,18 @@ def get_wrong_sample_ids(model_name, test_epoch, dataset_type):
                 probs = np.array([np.exp(predictions[i, j]) / exp_sum for j in range(n_classes)])
                 labels = batch[1][i]
 
+                results.append((np.argmax(probs) + 1, np.max(probs)))
+
                 if np.argmax(probs) == np.argmax(labels):
                     continue
 
-                wrong_sample_ids.append((batch_cnt*batch_size + i, np.argmax(probs) + 1, np.max(probs)))
+                wrong_sample_ids.append(batch_cnt*batch_size + i)
 
-        wrong_sample_ids = sorted(wrong_sample_ids, key=lambda x: -x[2])
-
-        return wrong_sample_ids
+        return results, wrong_sample_ids
 
 
 def validate_samples(model_name, test_epoch, dataset_type):
-    wrong_sample_ids = get_wrong_sample_ids(model_name, test_epoch, dataset_type)
+    results, wrong_sample_ids = run(model_name, test_epoch, dataset_type)
 
     text_data = []
     for arr in LOADED_DATASETS['ag_news'][dataset_type][0]:
@@ -71,7 +72,8 @@ def validate_samples(model_name, test_epoch, dataset_type):
         text_data.append(text)
 
     data = []
-    for i, pred_class, confd in wrong_sample_ids:
+    for i in range(len(results)):
+        pred_class, confd = results[i]
         data.append({
             'confidence': round(confd, 3),
             'correct class': DATASET_CLASS_NAMES['ag_news'][np.argmax(LOADED_DATASETS['ag_news'][dataset_type][1][i]) + 1],
@@ -79,12 +81,31 @@ def validate_samples(model_name, test_epoch, dataset_type):
             'predicted class': DATASET_CLASS_NAMES['ag_news'][pred_class]
         })
 
-    with open('wrong_samples_' + model_name + '.csv', 'w') as file:
+    wrong_data = []
+    for i in wrong_sample_ids:
+        pred_class, confd = results[i]
+        wrong_data.append({
+            'confidence': round(confd, 3),
+            'correct class': DATASET_CLASS_NAMES['ag_news'][
+                np.argmax(LOADED_DATASETS['ag_news'][dataset_type][1][i]) + 1],
+            'text': str(text_data[i]),
+            'predicted class': DATASET_CLASS_NAMES['ag_news'][pred_class]
+        })
+    wrong_data = list(sorted(wrong_data, key=lambda x: -x['confidence']))
+    data = list(sorted(data, key=lambda x: -x['confidence']))
+
+    with open('all_samples_' + model_name + '.csv', 'w') as file:
         fieldnames = ['confidence', 'predicted class', 'correct class', 'text']
         writer = csv.DictWriter(file, fieldnames, delimiter='\t')
         writer.writeheader()
         writer.writerows(data)
 
+    with open('wrong_samples_' + model_name + '.csv', 'w') as file:
+        fieldnames = ['confidence', 'predicted class', 'correct class', 'text']
+        writer = csv.DictWriter(file, fieldnames, delimiter='\t')
+        writer.writeheader()
+        writer.writerows(wrong_data)
+
 
 if __name__ == '__main__':
-    validate_samples('2018-04-16 15:23:21', 13, 3)
+    validate_samples('2018-05-19 15:18:04', 14, 4)

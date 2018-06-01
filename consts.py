@@ -151,7 +151,7 @@ PADDING_TOKEN = len(ALPHABET_DICT) + 1
 
 CURRENT_DATASET = 'ag_news'
 VALIDATION_TEST_DATASET_SIZE_RATIO = 0.1
-VALIDATION_TRAIN_DATASET_SIZE_RATIO = 1/6
+VALIDATION_TRAIN_DATASET_SIZE = 10000
 
 project_path = '~/nikita/'
 original_datasets_folder = 'datasets/original/'

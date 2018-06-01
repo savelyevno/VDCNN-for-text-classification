@@ -1,4 +1,5 @@
 checkpoints/*
+old_checkpoins/*
 .idea/*
 __pycache__/*
 datasets/preprocessed/*

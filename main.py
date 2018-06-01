@@ -69,18 +69,23 @@ def start_train(to_continue, model_name='', last_epoch=0):
                 last_args = pickle.load(file)
             train(graph, **last_args)
         else:
-            # train(graph,
-            #       model_name=model_name,
-            #       last_epoch=last_epoch,
-            #       to_validate=True,
-            #       validate_start_epoch=15,
-            #       train_on_full_dataset=False)
-            train_by_disagreement(graph,
-                                  model_name=model_name,
-                                  last_epoch=last_epoch,
-                                  to_validate=True,
-                                  validate_start_epoch=9,
-                                  train_on_full_dataset=False)
+            if bool(0):
+                train(graph,
+                      model_name=model_name,
+                      last_epoch=last_epoch,
+                      to_validate=False,
+                      validate_start_epoch=15,
+                      train_on_full_dataset=False)
+            else:
+                train_by_disagreement(graph,
+                                      model_name=model_name,
+                                      last_epoch=last_epoch,
+                                      batch_size=128,
+                                      to_validate=False,
+                                      validate_start_epoch=8,
+                                      train_on_full_dataset=False,
+                                      init_epoch_cnt=8,
+                                      lr_after_init=1e-3)
 
 
 def start_test(to_continue, model_name=None, test_epoch=None):
@@ -89,8 +94,8 @@ def start_test(to_continue, model_name=None, test_epoch=None):
             last_args = pickle.load(file)
         test(**last_args)
     else:
-        # test(model_name, test_epoch, 0)
-        test_disagreement(model_name, test_epoch, 0)
+        # test(model_name, [test_epoch], [0, 4])
+        test_disagreement(model_name, [test_epoch], [0, 4])
 
 
 def start_test_params(to_continue):
@@ -105,7 +110,15 @@ def start_test_params(to_continue):
             params=NetworkParams(['lr_decay_freq'], [(1, 5)], [False], [False], 5))
 
 
+def main():
+    # test_disagreement('2018-05-18 18:47:35', range(15, 40 + 1), [0, 4])
+    test('2018-05-19 15:18:04', range(10, 24 + 1), [0, 4])
+
+
 if __name__ == '__main__':
+    # main()
+    # exit(0)
+
     args = get_parser_args()
 
     if args.to_continue:

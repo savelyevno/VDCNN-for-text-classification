@@ -77,7 +77,7 @@ def train(
         vdcnn = VDCNN()
         vdcnn.build()
 
-    global_step = tf.Variable(
+    global_step_op = tf.Variable(
         initial_value=0,
         trainable=False,
         dtype=tf.int32,
@@ -85,7 +85,7 @@ def train(
     with tf.name_scope('adam_optimizer'):
         learning_rate = tf.train.exponential_decay(
             learning_rate=vdcnn.learn_rate,
-            global_step=global_step,
+            global_step=global_step_op,
             decay_steps=vdcnn.lr_decay_freq*(LOADED_DATASETS[CURRENT_DATASET][train_dataset][0].shape[0] / batch_size),
             decay_rate=vdcnn.lr_decay_rate,
             staircase=True,
@@ -93,7 +93,7 @@ def train(
 
         train_step = tf.contrib.layers.optimize_loss(
             loss=vdcnn.loss,
-            global_step=global_step,
+            global_step=global_step_op,
             learning_rate=learning_rate,
             optimizer='Adam',
             summaries=['gradients'])
@@ -110,17 +110,16 @@ def train(
     tf.summary.scalar(name='reg loss', tensor=vdcnn.reg_loss)
     summary = tf.summary.merge_all()
 
-    # Validation summary; is written every 100th batch
-    validation_accuracy_placeholder = tf.placeholder(tf.float32)
-    validation_summary = tf.summary.scalar(
+    # Validation summaries
+    vld_accuracy_placeholder = tf.placeholder(tf.float32)
+    vld_summary = tf.summary.scalar(
         name='validation_accuracy_new',
-        tensor=validation_accuracy_placeholder)
+        tensor=vld_accuracy_placeholder)
 
-    # Test summary; is written after every epoch
-    test_accuracy_placeholder = tf.placeholder(tf.float32)
-    test_summary = tf.summary.scalar(
-        name='test_accuracy',
-        tensor=test_accuracy_placeholder)
+    vld_small_accuracy_placeholder = tf.placeholder(tf.float32)
+    vld_small_summary = tf.summary.scalar(
+        name='validation_accuracy_new',
+        tensor=vld_small_accuracy_placeholder)
 
     saver = tf.train.Saver(max_to_keep=0)
 
@@ -145,8 +144,8 @@ def train(
 
         global_step = 0
         train_samples_cnt = 0
-        best_accuracy = 0
-        best_validation_accuracy = 0
+        best_vld_accuracy = 0
+        best_vld_small_accuracy = 0
         timer.start()
 
         print_log(to_log, 'start training...')
@@ -168,7 +167,7 @@ def train(
                     _, global_step, train_accuracy = sess.run(
                         [
                             train_step,
-                            global_step,
+                            global_step_op,
                             vdcnn.accuracy],
                         feed_dict=feed_dict)
                     train_samples_cnt = global_step * batch_size
@@ -176,7 +175,7 @@ def train(
                     _, global_step, loss, train_accuracy, summary_str, lr, reg_loss = sess.run(
                         [
                             train_step,
-                            global_step,
+                            global_step_op,
                             vdcnn.loss,
                             vdcnn.accuracy,
                             summary,
@@ -188,10 +187,10 @@ def train(
                     print_log(to_log,
                               '\ttrain samples cnt: {}, train accuracy {}, loss {}, reg loss {}, lr: {}; dt = {}',
                               train_samples_cnt,
-                              train_accuracy,
-                              loss,
-                              reg_loss,
-                              lr,
+                              str(round(train_accuracy, 3)),
+                              str(round(loss, 3)),
+                              str(round(reg_loss, 5)),
+                              str(round(lr, 10)),
                               timer.stop_start())
 
                     # Write summary
@@ -201,37 +200,37 @@ def train(
 
                 if to_validate and i_epoch >= validate_start_epoch:
                     feed_dict[vdcnn.is_training] = False
-                    validation_accuracy = calc_accuracy(sess=sess,
-                                                        accuracy=vdcnn.accuracy,
-                                                        input_tensor=vdcnn.network_input,
-                                                        y_=vdcnn.correct_labels,
-                                                        feed_dict=feed_dict,
-                                                        data_set_type=3)
+                    vld_small_accuracy = calc_accuracy(sess=sess,
+                                                       accuracy=vdcnn.accuracy,
+                                                       input_tensor=vdcnn.network_input,
+                                                       y_=vdcnn.correct_labels,
+                                                       feed_dict=feed_dict,
+                                                       data_set_type=5)
                     # Write summary
-                    summary_str = sess.run(validation_summary, feed_dict={validation_accuracy_placeholder: validation_accuracy})
+                    summary_str = sess.run(vld_small_summary, feed_dict={vld_small_accuracy_placeholder: vld_small_accuracy})
                     summary_writer.add_summary(summary_str, train_samples_cnt + 1)
                     summary_writer.flush()
 
-                    if (validation_accuracy - best_validation_accuracy) > -1e-2:
-                        if validation_accuracy > best_validation_accuracy:
-                            best_validation_accuracy = validation_accuracy
+                    if (vld_small_accuracy - best_vld_small_accuracy) > -1e-2:
+                        if vld_small_accuracy > best_vld_small_accuracy:
+                            best_vld_small_accuracy = vld_small_accuracy
 
-                        test_accuracy = calc_accuracy(
-                            sess=sess,
-                            accuracy=vdcnn.accuracy,
-                            input_tensor=vdcnn.network_input,
-                            y_=vdcnn.correct_labels,
-                            feed_dict=feed_dict,
-                            data_set_type=0)
+                            vld_accuracy = calc_accuracy(
+                                sess=sess,
+                                accuracy=vdcnn.accuracy,
+                                input_tensor=vdcnn.network_input,
+                                y_=vdcnn.correct_labels,
+                                feed_dict=feed_dict,
+                                data_set_type=4)
 
-                        summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
+                        summary_str = sess.run(vld_summary, feed_dict={vld_accuracy_placeholder: vld_accuracy})
                         summary_writer.add_summary(summary_str, train_samples_cnt + 2)
                         summary_writer.flush()
 
-                        if test_accuracy > best_accuracy:
-                            best_accuracy = test_accuracy
+                        if vld_accuracy > best_vld_accuracy:
+                            best_vld_accuracy = vld_accuracy
 
-                            print_log(to_log, '\tbest test accuracy update: {}', test_accuracy)
+                            print_log(to_log, '\tbest validation accuracy update: {}', vld_accuracy)
 
                             saver.save(
                                 sess=sess,
@@ -240,17 +239,17 @@ def train(
                                 write_meta_graph=False)
 
             feed_dict[vdcnn.is_training] = False
-            test_accuracy = calc_accuracy(
+            vld_accuracy = calc_accuracy(
                 sess=sess,
                 accuracy=vdcnn.accuracy,
                 input_tensor=vdcnn.network_input,
                 y_=vdcnn.correct_labels,
                 feed_dict=feed_dict,
-                data_set_type=0)
-            best_accuracy = max(best_accuracy, test_accuracy)
-            print_log(to_log, 'test accuracy: {}', test_accuracy)
+                data_set_type=4)
+            best_vld_accuracy = max(best_vld_accuracy, vld_accuracy)
+            print_log(to_log, 'validation accuracy: {}', vld_accuracy)
 
-            summary_str = sess.run(test_summary, feed_dict={test_accuracy_placeholder: test_accuracy})
+            summary_str = sess.run(vld_summary, feed_dict={vld_accuracy_placeholder: vld_accuracy})
             summary_writer.add_summary(summary_str, train_samples_cnt + 3)
             summary_writer.flush()
 
@@ -266,4 +265,4 @@ def train(
 
         print_log(to_log, 'training done in {}', timer.stop())
 
-    return best_accuracy, model_name
+    return best_vld_accuracy, model_name
